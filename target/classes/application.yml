@@ -1,0 +1,11 @@
+app: 
+ name: timer 
+---
+server: 
+ port: 8100
+---
+info: 
+ app: 
+  encoding: UTF-8
+---
+

@@ -5,8 +5,8 @@
 * 实时、保障型通知第三方。
 ## 使用方法
 
-* 提交定时任务，通过调用 http://url/submit/job
-* 提交实时保障型通知 http://url/submit/notify
+* 提交定时任务，通过调用 http://url/timer/submit/job
+* 提交实时保障型通知 http://url/timer/submit/notify
 * 终态(成功，最终失败) 回调给使用方 http://url/callback，URL 是使用方的。
 
 ## 请求内容

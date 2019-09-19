@@ -1,5 +1,16 @@
 CREATE DATABASE gx_timer
 
+CREATE TABLE `timer_lock`(
+`app_id` varchar(32) NOT NULL DEFAULT '' COMMENT '接入方ID',
+`lock_owner` varchar(64) NOT NULL DEFAULT '' COMMENT '锁的拥有者',
+`lock_name` varchar(64) NOT NULL DEFAULT '' COMMENT '锁的名称',
+`lock_status` int NOT NULL DEFAULT 0 COMMENT '0 释放, 1 锁',
+`create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+`update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY `idx_lock` (`app_id`, `lock_name`),
+ KEY `idx_ct` (`create_time`)
+)ENGINE=InnoDB  DEFAULT CHARSET=utf8
+
 CREATE TABLE `timer_job`(
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `app_id` varchar(32) NOT NULL DEFAULT '' COMMENT '接入方ID',
@@ -17,7 +28,8 @@ CREATE TABLE `timer_job`(
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_job` (`app_id`, `job_id`), 
-  KEY `idx_nt` (`next_time`)
+  KEY `idx_nt` (`next_time`),
+  KEY `idx_ct` (`create_time`)
 )ENGINE=InnoDB  DEFAULT CHARSET=utf8
 
 
@@ -38,5 +50,6 @@ CREATE TABLE `timer_cb`(
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_job` (`app_id`, `job_id`), 
-  KEY `idx_nt` (`next_time`)
+  KEY `idx_nt` (`next_time`),
+  KEY `idx_ct` (`create_time`)
 )ENGINE=InnoDB  DEFAULT CHARSET=utf8

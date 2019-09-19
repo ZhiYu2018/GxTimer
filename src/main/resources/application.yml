@@ -1,11 +1,3 @@
-app: 
- name: timer 
----
-server: 
- port: 8100
----
-info: 
- app: 
-  encoding: UTF-8
----
-
+spring: 
+ profiles: 
+  active: dev

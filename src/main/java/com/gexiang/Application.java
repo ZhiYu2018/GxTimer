@@ -1,6 +1,5 @@
 package com.gexiang;
 
-import com.gexiang.server.TimerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.Banner;
@@ -22,6 +21,6 @@ public class Application {
     @PreDestroy
     public void  dostory(){
         logger.info("Post dostory ......");
-        ContextAware.getBean(TimerService.class).stop();
+        AppStatus.setbQuit();
     }
 }

@@ -22,5 +22,6 @@
         <mapper resource="mapper/LockMapper.xml"/>
         <mapper resource="mapper/JobMapper.xml"/>
 		<mapper resource="mapper/NotifyMapper.xml"/>
+		<mapper resource="mapper/JobTimeMapper.xml"/>
     </mappers>
 </configuration>

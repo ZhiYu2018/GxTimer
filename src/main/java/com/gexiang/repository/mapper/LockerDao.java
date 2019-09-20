@@ -1,11 +1,12 @@
 package com.gexiang.repository.mapper;
 
 import com.gexiang.repository.entity.TimerLock;
-import org.springframework.stereotype.Repository;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
-@Repository
+@Mapper
 public interface LockerDao {
-    int create(TimerLock lock);
-    int lock(TimerLock lock);
-    int unlock(TimerLock lock);
+    Integer create(@Param("lock")TimerLock lock);
+    Integer lock(@Param("lock")TimerLock lock);
+    Integer unlock(@Param("lock")TimerLock lock);
 }

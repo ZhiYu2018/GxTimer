@@ -11,21 +11,24 @@ info:
 spring: 
  datasource: 
   druid: 
-   url: "jdbc:mysql://192.168.3.28:3306/gxtimer?useUnicode=true&characterEncoding=utf-8"
-   username: "gexiang"
-   password: "Gxdt@2019"
-   driver-class-name: "com.mysql.cj.jdbc.Driver"
-   filters: "wall,stat"
+   url: jdbc:mysql://192.168.3.28:3306/gxtimer?useUnicode=true&characterEncoding=utf-8
+   username: gexiang
+   password: Gxdt@2019
+   driver-class-name: com.mysql.cj.jdbc.Driver
+   filters: wall,stat
    maxActive: 20
    initialSize: 1
    maxWait: 60000
    minIdle: 1
    timeBetweenEvictionRunsMillis: 60000
    minEvictableIdleTimeMillis: 300000
-   validationQuery: "SELECT 1"
+   validationQuery: SELECT 1
    testOnBorrow: false
    testOnReturn: false
    testWhileIdle: true
    poolPreparedStatements: true 
    maxOpenPreparedStatements: 20
-   asyncInit: true 
+   asyncInit: true
+---
+mybatis:
+ config-location: classpath:mybatis-config.xml

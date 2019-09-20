@@ -14,14 +14,18 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.gexiang.repository.mapper.LockerDao">
-    <insert id="create" parameterType="TimerLock">
-        INSERT INTO timer_lock(app_id, lock_owner, lock_name, lock_status) VALUES(#{lock.appId}, #{lock.lockOwner}, #{lock.name}, #{lock.status})
-    </insert>
-	<update id="lock" parameterType="TimerLock">
-		UPDATE timer_lock SET lock_status = 1,lock_owner = #{lock.lockOwner},update_time = Now() WHERE app_id = #{lock.appId} AND lock_name = #{lock.name} AND lock_status = 0
-	</update>
-	<update id="unlock" parameterType="TimerLock">
-		UPDATE timer_lock SET lock_status = 0, update_time = Now() WHERE app_id = #{lock.appId} AND lock_name = #{lock.name} AND lock_owner = #{lock.lockOwner} AND lock_status = 1
-	</update>
+<mapper namespace="com.gexiang.repository.mapper.TimeDao">
+	<select id="getNow" resultType="Long">
+		SELECT UNIX_TIMESTAMP()
+	</select>
+	<select id="getToday" resultType="Long">
+		SELECT UNIX_TIMESTAMP(DATE_FORMAT(NOW(), '%Y-%m-%d'))
+	</select>
+	<select id="queryJobTime" resultType="Long">
+		SELECT job_last_time FROM timer_jobtime WHERE job_name = #{jobName}
+	</select>
+	<insert id="insertOrUpdate" parameterType="TimerJobTime">
+		INSERT INTO timer_jobtime(job_name, job_last_time) VALUES(#{jobTime.jobName},#{jobTime.lastTime}) 
+		ON DUPLICATE KEY UPDATE job_last_time = #{jobTime.lastTime},update_time = NOW()
+	</insert>
 </mapper>

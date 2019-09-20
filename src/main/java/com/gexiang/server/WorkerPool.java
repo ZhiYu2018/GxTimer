@@ -1,5 +1,6 @@
 package com.gexiang.server;
 
+import com.gexiang.AppStatus;
 import com.google.common.util.concurrent.RateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +62,7 @@ public class WorkerPool<T> {
 
     private void work(){
         logger.info("{} is running ......", Thread.currentThread().getName());
-        while (!stop){
+        while (!AppStatus.getAppStatus()){
             try {
                 if (semaphore.tryAcquire(3, TimeUnit.SECONDS)) {
                     /**限速，执行**/

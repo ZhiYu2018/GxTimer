@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+       Copyright 2015-2019 the original author or authors.
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+          http://www.apache.org/licenses/LICENSE-2.0
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+-->
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gexiang.repository.mapper.NotifyDao">
+    <resultMap type="com.gexiang.repository.entity.TimerReq" id="MapTimerReq">
+		<id column="id" property="Id"/>
+		<result column="app_id" property="appId"/>
+		<result column="job_id" property="jobId"/>
+		<result column="job_times" property="times"/>
+		<result column="job_status" property="status"/>
+		<result column="req_type" property="reqType"/>
+		<result column="data_type" property="dataType"/>
+		<result column="req_url" property="reqUrl"/>
+		<result column="cb_url" property="cbUrl"/>
+		<result column="req_body" property="reqBody"/>
+		<result column="req_header" property="reqHeader"/>
+		<result column="next_time" property="nextTime"/>
+		<result column="end_time" property="endTime"/>
+	</resultMap>
+	<insert id="add" parameterType="TimerReq">
+		INSERT INTO timer_cb(id, app_id, job_id, job_times, job_status, req_type, data_type, req_url, cb_url, req_body, req_header, next_time, end_time) 
+		VALUES (NULL, #{req.appId},#{req.jobId},#{req.times},#{req.status},#{req.reqType},#{req.dataType},#{req.reqUrl},#{req.cbUrl},#{req.reqBody},#{req.reqHeader},#{req.nextTime},#{req.endTime})
+	</insert>
+	<select id="getDelta" resultMap="MapTimerReq">
+		SELECT id, app_id, job_id, job_times, job_status, req_type, data_type, req_url, cb_url, req_body, req_header, next_time, end_time FROM timer_cb  
+		WHERE id > #{offsetId} AND next_time <![CDATA[>=]]> #{start} AND next_time <![CDATA[<]]> #{end} AND job_status = 0 AND end_time <![CDATA[>=]]> #{start}  
+		ORDER BY id LIMIT #{limit} 
+	</select>
+	<update id="updatePending" parameterType="TimerReq">
+		UPDATE timer_cb SET next_time = #{req.nextTime}, job_times = job_times + 1, job_status = 0 WHERE id = #{req.Id}
+	</update>
+	<update id="updateStatus" parameterType="TimerReq">
+		UPDATE timer_cb SET job_status = #{req.status} WHERE id = #{req.Id}
+	</update>	
+</mapper>

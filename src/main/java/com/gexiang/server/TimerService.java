@@ -2,6 +2,7 @@ package com.gexiang.server;
 
 import com.gexiang.Util.Helper;
 import com.gexiang.constant.ConstValue;
+import com.gexiang.io.IoFactory;
 import com.gexiang.repository.entity.TimerReq;
 import com.gexiang.repository.mapper.JobDao;
 import com.gexiang.repository.mapper.LockerDao;
@@ -153,7 +154,7 @@ public class TimerService {
     private void jobConsumer(TimerReq timerReq){
         try{
             timerReq.setStatus(ConstValue.JOB_SUCCESS_STATE);
-            jobDao.updateStatus(timerReq);
+            IoFactory.getInstance().forward(timerReq);
         }catch (Throwable t){
             logger.warn("Update job {}.{} exceptions:{}", timerReq.getAppId(), timerReq.getJobId(), t.getMessage());
         }

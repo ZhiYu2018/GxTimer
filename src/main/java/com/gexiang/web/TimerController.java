@@ -27,9 +27,9 @@ public class TimerController {
 
     @PostMapping("/submit/job")
     public Mono<GxTimerResponse> submitJob(@RequestBody GxTimerRequest request){
-        logger.info("call /submit/job:{}.{}", request.getAppId(), request.getJobId());
+        logger.info("call /submit/job:{}.{} cbUrl:{}", request.getAppId(), request.getJobId(), request.getCbUrl());
         try{
-            //checkArgs(request);
+            checkArgs(request);
             return timerService.submitJob(request);
         }catch (IllegalArgumentException e){
             GxTimerResponse response = new GxTimerResponse();
@@ -48,9 +48,9 @@ public class TimerController {
 
     @PostMapping("/submit/notify")
     public Mono<GxTimerResponse> submitNotify(@RequestBody GxTimerRequest request){
-        logger.info("call /submit/notify:{}.{}", request.getAppId(), request.getJobId());
+        logger.info("call /submit/notify:{}.{} cbUrl:{}", request.getAppId(), request.getJobId(), request.getCbUrl());
         try{
-            //checkArgs(request);
+            checkArgs(request);
             return timerService.submitNotify(request);
         }catch (IllegalArgumentException e){
             GxTimerResponse response = new GxTimerResponse();
@@ -78,7 +78,7 @@ public class TimerController {
                                                         ConstValue.DATA_FORM_TYPE), "dataType Error");
         Preconditions.checkArgument((request.getTimeUsed() >= 0), "timeUsed Error");
         Preconditions.checkArgument(Helper.isStrLenLess(request.getReqUrl(), ConstValue.URL_MAX_LEN), "reqUrl Error");
-        Preconditions.checkArgument(Helper.isStrLenBigger(request.getCbUrl(), ConstValue.URL_MAX_LEN), "cbUrl Error");
+        Preconditions.checkArgument(!Helper.isStrLenBigger(request.getCbUrl(), ConstValue.URL_MAX_LEN), "cbUrl Error");
         Preconditions.checkArgument(!Helper.isStrLenBigger(request.getReqBody(), ConstValue.BODY_MAX_LEN), "body Error");
         Preconditions.checkArgument(!Helper.isStrLenBigger(request.getReqHeader(), ConstValue.HEADER_MAX_LEN), "header Error");
     }

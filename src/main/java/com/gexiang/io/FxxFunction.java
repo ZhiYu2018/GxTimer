@@ -16,7 +16,7 @@ public class FxxFunction implements Function<ClientResponse, Mono<? extends Thro
     }
     @Override
     public Mono<FxxException> apply(ClientResponse clientResponse) {
-        logger.info("appId:{}, jobId:{} 4xx error", timerReq.getAppId(), timerReq.getJobId());
+        logger.debug("appId:{}, jobId:{} 4xx error", timerReq.getAppId(), timerReq.getJobId());
         return Mono.error(new FxxException(timerReq, clientResponse.statusCode()));
     }
 }

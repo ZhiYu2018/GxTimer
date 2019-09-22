@@ -58,7 +58,7 @@ public class CDRWriter {
         sb.append(status).append("\t").append(body).append("\n");
         byte[] content = sb.toString().getBytes();
         synchronized (this){
-            if(((offset + content.length) >= MAX_FILE_SIZE) && (mappedByteBuffer == null)){
+            if(((offset + content.length) >= MAX_FILE_SIZE) || (mappedByteBuffer == null)){
                 open();
             }
             if(mappedByteBuffer != null){

@@ -40,9 +40,9 @@
 		ORDER BY id LIMIT #{limit} 
 	</select>
 	<update id="updatePending" parameterType="TimerReq">
-		UPDATE timer_cb SET  job_status = 0, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
+		UPDATE timer_job SET  job_status = 0, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
 	</update>
 	<update id="updateStatus" parameterType="TimerReq">
-		UPDATE timer_cb SET job_status = #{req.status}, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
+		UPDATE timer_job SET job_status = #{req.status}, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
 	</update>	
 </mapper>

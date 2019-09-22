@@ -22,7 +22,7 @@ public class IoSubscriber implements Subscriber<String> {
 
     @Override
     public void onSubscribe(Subscription subscription) {
-        subscription.request(0);
+        subscription.request(1L);
     }
 
     @Override
@@ -32,14 +32,14 @@ public class IoSubscriber implements Subscriber<String> {
 
     @Override
     public void onError(Throwable throwable) {
-        logger.warn("appId:{}, jobId:{}, error:{}", req.getAppId(), req.getJobId(), throwable.getMessage());
-        workerPool.push(new GxResult<>(req, throwable));
+        logger.debug("appId:{}, jobId:{}, error:{}", req.getAppId(), req.getJobId(), throwable.getMessage());
+        workerPool.push(new GxResult<>(req, throwable, -1));
     }
 
     @Override
     public void onComplete() {
         String content = sb.toString();
         logger.debug("appId:{}, jobId:{}, onComplete, result {}", req.getAppId(), req.getJobId(), content);
-        workerPool.push(new GxResult<>(req, content));
+        workerPool.push(new GxResult<>(req, content, 0));
     }
 }

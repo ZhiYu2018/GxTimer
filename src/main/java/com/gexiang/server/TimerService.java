@@ -105,6 +105,15 @@ public class TimerService implements AutoCloseable{
     private void handleNotify(TimerConsumer timerConsumer){
         /**直接调用**/
         TimerReq timerReq = Helper.transFromRequest(timerConsumer.getRequest());
+        Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_NOTIFY_NAME);
+        timerReq.setNextTime(JobTimeMgr.calNextJobTime(now));
+        Long timeLong = timerReq.getEndTime();
+        if(timeLong == null){
+            timeLong = ConstValue.DEF_JOB_TIME_LONG;
+        }
+        Long end = Long.valueOf(now.longValue() + timeLong.longValue());
+        timerReq.setEndTime(JobTimeMgr.calNextJobTime(end));
+
         IoFactory.getInstance().forward(timerReq, notifyResultWorker);
     }
 
@@ -160,7 +169,6 @@ public class TimerService implements AutoCloseable{
     }
 
     private void jobConsumer(TimerReq timerReq){
-        timerReq.setTimes(timerReq.getTimes() + 1);
         IoFactory.getInstance().forward(timerReq, jobResultWorker);
     }
 
@@ -216,12 +224,11 @@ public class TimerService implements AutoCloseable{
     }
 
     private void nofityConsumer(TimerReq timerReq){
-        timerReq.setTimes(timerReq.getTimes() + 1);
         IoFactory.getInstance().forward(timerReq, notifyResultWorker);
     }
 
     private void handJobReturn(GxResult<TimerReq, Object> result){
-        if(result.getResult() instanceof String){
+        if(result.getStatus() == 0){
             /***对方有成功反应，算是成功**/
             String body = String.valueOf(result.getResult());
             if(!Helper.isStrEmpty(result.getData().getCbUrl())){
@@ -245,6 +252,7 @@ public class TimerService implements AutoCloseable{
             CDRWriter.getInstance().write("job", result.getData().getAppId(),
                                           result.getData().getJobId(), "OK", body);
         }else{
+            result.getData().setTimes(result.getData().getTimes() + 1);
             long nextSecond = TimerBackoff.defaultBackOff.nextBackOffSecond(result.getData().getTimes());
             Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_JOB_NAME);
             long nextTime   = JobTimeMgr.calNextJobTime(now + nextSecond);
@@ -263,7 +271,7 @@ public class TimerService implements AutoCloseable{
                 CDRWriter.getInstance().write("job", result.getData().getAppId(),
                                               result.getData().getJobId(), "Service Unavailable", "Time over");
             }else{
-                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+                result.getData().setStatus(ConstValue.JOB_IDLE_STATE);
             }
             result.getData().setNextTime(nextTime);
             try{
@@ -278,7 +286,7 @@ public class TimerService implements AutoCloseable{
     }
 
     private void handNotifyReturn(GxResult<TimerReq, Object> result){
-        if(result.getResult() instanceof String){
+        if(result.getStatus() == 0){
             /***对方有成功反应，算是成功**/
             String body = String.valueOf(result.getResult());
             if(!Helper.isStrEmpty(result.getData().getCbUrl())){
@@ -292,6 +300,10 @@ public class TimerService implements AutoCloseable{
             }
             /**处理成功**/
             result.getData().setStatus(ConstValue.JOB_SUCCESS_STATE);
+            if(result.getData().getNextTime() == null){
+                Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_NOTIFY_NAME);
+                result.getData().setNextTime(JobTimeMgr.calNextJobTime(now));
+            }
             try{
                 notifyDao.insertUpdate(result.getData());
             }catch (Throwable t){
@@ -302,8 +314,9 @@ public class TimerService implements AutoCloseable{
             CDRWriter.getInstance().write("notify", result.getData().getAppId(),
                     result.getData().getJobId(), "OK", body);
         }else{
+            result.getData().setTimes(result.getData().getTimes() + 1);
             long nextSecond = TimerBackoff.defaultBackOff.nextBackOffSecond(result.getData().getTimes());
-            Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_JOB_NAME);
+            Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_NOTIFY_NAME);
             long nextTime   = JobTimeMgr.calNextJobTime(now + nextSecond);
             if(nextTime > result.getData().getEndTime()){
                 /**失败**/
@@ -320,7 +333,7 @@ public class TimerService implements AutoCloseable{
                 CDRWriter.getInstance().write("notify", result.getData().getAppId(),
                         result.getData().getJobId(), "Service Unavailable", "Time over");
             }else{
-                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+                result.getData().setStatus(ConstValue.JOB_IDLE_STATE);
             }
             result.getData().setNextTime(nextTime);
             try{

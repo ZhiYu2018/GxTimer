@@ -14,7 +14,7 @@ public class CbSubscriber implements Subscriber<Void> {
     }
     @Override
     public void onSubscribe(Subscription subscription) {
-        subscription.request(0L);
+        subscription.request(1L);
     }
 
     @Override

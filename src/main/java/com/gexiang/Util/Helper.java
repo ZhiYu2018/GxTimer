@@ -5,6 +5,13 @@ import com.gexiang.repository.entity.TimerReq;
 import com.gexiang.vo.GxTimerRequest;
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import java.lang.reflect.Method;
+import java.nio.MappedByteBuffer;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -23,12 +30,8 @@ public class Helper {
         return new String(randBuffer);
     }
 
-    public static boolean isStrLenEqual(String str, int len){
-        if(str == null){
-            return false;
-        }else{
-            return (str.length() == len);
-        }
+    public static boolean isStrEmpty(String str){
+        return ((str == null) || str.isEmpty());
     }
 
     public static boolean isStrLenLess(String str, int len){
@@ -62,7 +65,7 @@ public class Helper {
         timerReq.setReqType(request.getReqType());
         timerReq.setReqBody(request.getReqBody());
         timerReq.setReqHeader(request.getReqHeader());
-        timerReq.setTimes(0);
+        timerReq.setTimes(Integer.valueOf(0));
         timerReq.setStatus(Integer.valueOf(0));
         if(timerReq.getReqBody() == null){
             timerReq.setReqBody(ConstValue.DATA_EMPTY);
@@ -74,5 +77,31 @@ public class Helper {
             timerReq.setCbUrl(ConstValue.DATA_EMPTY);
         }
         return timerReq;
+    }
+
+    public static void umap(MappedByteBuffer mappedByteBuffer){
+        AccessController.doPrivileged((PrivilegedAction<String>)() ->{
+                try {
+                    Method getCleanerMethod = mappedByteBuffer.getClass().getMethod("cleaner",new Class[0]);
+                    getCleanerMethod.setAccessible(true);
+                    sun.misc.Cleaner cleaner = (sun.misc.Cleaner)getCleanerMethod.invoke(mappedByteBuffer,new Object[0]);
+                    cleaner.clean();
+                    return "Success";
+                }
+                catch (Exception e) {
+                    return e.getMessage();
+                }
+        });
+    }
+
+    public static String getDateStr(long timeMills){
+        synchronized (Helper.class) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTimeInMillis(timeMills);
+            Date date = calendar.getTime();
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd_hhmmss");
+            String dateString = format.format(date);
+            return dateString;
+        }
     }
 }

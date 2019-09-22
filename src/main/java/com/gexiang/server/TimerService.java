@@ -1,19 +1,24 @@
 package com.gexiang.server;
 
 import com.gexiang.Util.Helper;
+import com.gexiang.Util.TimerBackoff;
 import com.gexiang.constant.ConstValue;
+import com.gexiang.io.CDRWriter;
 import com.gexiang.io.IoFactory;
 import com.gexiang.repository.entity.TimerReq;
 import com.gexiang.repository.mapper.JobDao;
 import com.gexiang.repository.mapper.LockerDao;
 import com.gexiang.repository.mapper.NotifyDao;
 import com.gexiang.repository.mapper.TimeDao;
+import com.gexiang.vo.GxResult;
+import com.gexiang.vo.GxTimeCbRequest;
 import com.gexiang.vo.GxTimerRequest;
 import com.gexiang.vo.GxTimerResponse;
 import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
@@ -21,20 +26,21 @@ import java.util.List;
 
 
 @Service
-public class TimerService {
+public class TimerService implements AutoCloseable{
     private static final int JOB_RATE = 250;
     private static final int NOTIFY_RATE = 500;
-    private static final int MAX_QUEUE_SIZE = 10000;
+    private static final int MAX_QUEUE_SIZE = 2000;
     private static Logger logger = LoggerFactory.getLogger(TimerService.class);
     private final LockerDao lockerDao;
     private final JobDao jobDao;
     private final NotifyDao notifyDao;
-    private final TimeDao timeDao;
     private String owner;
     private GxLock jobLock;
     private GxLock notifyLock;
     private WorkerPool<TimerConsumer> jobWorker;
     private WorkerPool<TimerConsumer> notifyWorker;
+    private WorkerPool<GxResult<TimerReq, Object>> jobResultWorker;
+    private WorkerPool<GxResult<TimerReq, Object>> notifyResultWorker;
     private ProducerConsumer<TimerReq> jobProducerConsumer;
     private ProducerConsumer<TimerReq> notifyProducerConsumer;
 
@@ -44,9 +50,9 @@ public class TimerService {
         this.lockerDao = lockerDao;
         this.jobDao = jobDao;
         this.notifyDao = notifyDao;
-        this.timeDao = timeDao;
         /**初始化**/
         JobTimeMgr.getInstance().setTimeDao(timeDao);
+        CDRWriter.getInstance().init("./cdr/");
         Preconditions.checkArgument((lockerDao != null), "Locker Dao is null");
         Preconditions.checkArgument((jobDao != null), "jobDao is null");
         Preconditions.checkArgument((notifyDao != null), "notifyDao is null");
@@ -55,15 +61,20 @@ public class TimerService {
         logger.info("Owner:{}, Cpu num:{}", owner, cpuNum);
         jobWorker = new WorkerPool<>(cpuNum, JOB_RATE, MAX_QUEUE_SIZE, "job", this::handleJob);
         notifyWorker = new WorkerPool<>(2, NOTIFY_RATE, MAX_QUEUE_SIZE, "notify", this::handleNotify);
+        jobResultWorker = new WorkerPool<>(cpuNum, JOB_RATE, MAX_QUEUE_SIZE, "job.return", this::handJobReturn);
+        notifyResultWorker = new WorkerPool<>(cpuNum, JOB_RATE, MAX_QUEUE_SIZE, "notify.return", this::handNotifyReturn);
         jobProducerConsumer = new ProducerConsumer<>("job", 1000L, this::jobProducer, this::jobConsumer);
         notifyProducerConsumer = new ProducerConsumer<>("notify", 1000L, this::notifyProducer, this::nofityConsumer);
     }
 
-    public void stop(){
+    @Override
+    public void close(){
+        logger.info("TimerService is close");
         jobWorker.setStop();
         notifyWorker.setStop();
         jobProducerConsumer.setStop();
         notifyProducerConsumer.setStop();
+        CDRWriter.getInstance().close();
     }
 
     public Mono<GxTimerResponse> submitJob(GxTimerRequest request){
@@ -92,12 +103,9 @@ public class TimerService {
     }
 
     private void handleNotify(TimerConsumer timerConsumer){
-//        TimerReq timerReq = Helper.transFromRequest(timerConsumer.getRequest());
-//        try{
-//            notifyDao.add(timerReq);
-//        }catch (Throwable t){
-//            logger.warn("Insert notify {}.{} exceptions:{}", timerReq.getAppId(), timerReq.getJobId(), t.getMessage());
-//        }
+        /**直接调用**/
+        TimerReq timerReq = Helper.transFromRequest(timerConsumer.getRequest());
+        IoFactory.getInstance().forward(timerReq, notifyResultWorker);
     }
 
     private void jobProducer(ProducerConsumer<TimerReq> producerConsumer){
@@ -152,12 +160,8 @@ public class TimerService {
     }
 
     private void jobConsumer(TimerReq timerReq){
-        try{
-            timerReq.setStatus(ConstValue.JOB_SUCCESS_STATE);
-            IoFactory.getInstance().forward(timerReq);
-        }catch (Throwable t){
-            logger.warn("Update job {}.{} exceptions:{}", timerReq.getAppId(), timerReq.getJobId(), t.getMessage());
-        }
+        timerReq.setTimes(timerReq.getTimes() + 1);
+        IoFactory.getInstance().forward(timerReq, jobResultWorker);
     }
 
     private void notifyProducer(ProducerConsumer<TimerReq> producerConsumer){
@@ -212,6 +216,121 @@ public class TimerService {
     }
 
     private void nofityConsumer(TimerReq timerReq){
+        timerReq.setTimes(timerReq.getTimes() + 1);
+        IoFactory.getInstance().forward(timerReq, notifyResultWorker);
+    }
 
+    private void handJobReturn(GxResult<TimerReq, Object> result){
+        if(result.getResult() instanceof String){
+            /***对方有成功反应，算是成功**/
+            String body = String.valueOf(result.getResult());
+            if(!Helper.isStrEmpty(result.getData().getCbUrl())){
+                GxTimeCbRequest gxcb = new GxTimeCbRequest();
+                gxcb.setStatus(HttpStatus.OK.value());
+                gxcb.setMsg(HttpStatus.OK.getReasonPhrase());
+                gxcb.setAppId(result.getData().getAppId());
+                gxcb.setJobId(result.getData().getJobId());
+                gxcb.setBody(body);
+                IoFactory.getInstance().callBack(gxcb, result.getData().getCbUrl());
+            }
+            /**处理成功**/
+            result.getData().setStatus(ConstValue.JOB_SUCCESS_STATE);
+            try{
+                jobDao.updateStatus(result.getData());
+            }catch (Throwable t){
+                logger.error("Update appId:{}, jobId:{}, Status:{}, exceptions:{}",
+                             result.getData().getAppId(), result.getData().getJobId(), ConstValue.JOB_SUCCESS_STATE,
+                             t.getMessage());
+            }
+            CDRWriter.getInstance().write("job", result.getData().getAppId(),
+                                          result.getData().getJobId(), "OK", body);
+        }else{
+            long nextSecond = TimerBackoff.defaultBackOff.nextBackOffSecond(result.getData().getTimes());
+            Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_JOB_NAME);
+            long nextTime   = JobTimeMgr.calNextJobTime(now + nextSecond);
+            if(nextTime > result.getData().getEndTime()){
+                /**失败**/
+                if(!Helper.isStrEmpty(result.getData().getCbUrl())){
+                    GxTimeCbRequest gxcb = new GxTimeCbRequest();
+                    gxcb.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+                    gxcb.setMsg(HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase());
+                    gxcb.setAppId(result.getData().getAppId());
+                    gxcb.setJobId(result.getData().getJobId());
+                    gxcb.setBody("Time over");
+                    IoFactory.getInstance().callBack(gxcb, result.getData().getCbUrl());
+                }
+                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+                CDRWriter.getInstance().write("job", result.getData().getAppId(),
+                                              result.getData().getJobId(), "Service Unavailable", "Time over");
+            }else{
+                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+            }
+            result.getData().setNextTime(nextTime);
+            try{
+                jobDao.updateStatus(result.getData());
+            }catch (Throwable t){
+                logger.error("Update appId:{}, jobId:{}, Status:{}, exceptions:{}",
+                        result.getData().getAppId(), result.getData().getJobId(), ConstValue.JOB_SUCCESS_STATE,
+                        t.getMessage());
+            }
+        }
+        result.setData(null);
+    }
+
+    private void handNotifyReturn(GxResult<TimerReq, Object> result){
+        if(result.getResult() instanceof String){
+            /***对方有成功反应，算是成功**/
+            String body = String.valueOf(result.getResult());
+            if(!Helper.isStrEmpty(result.getData().getCbUrl())){
+                GxTimeCbRequest gxcb = new GxTimeCbRequest();
+                gxcb.setStatus(HttpStatus.OK.value());
+                gxcb.setMsg(HttpStatus.OK.getReasonPhrase());
+                gxcb.setAppId(result.getData().getAppId());
+                gxcb.setJobId(result.getData().getJobId());
+                gxcb.setBody(body);
+                IoFactory.getInstance().callBack(gxcb, result.getData().getCbUrl());
+            }
+            /**处理成功**/
+            result.getData().setStatus(ConstValue.JOB_SUCCESS_STATE);
+            try{
+                notifyDao.insertUpdate(result.getData());
+            }catch (Throwable t){
+                logger.error("Update appId:{}, jobId:{}, Status:{}, exceptions:{}",
+                        result.getData().getAppId(), result.getData().getJobId(), ConstValue.JOB_SUCCESS_STATE,
+                        t.getMessage());
+            }
+            CDRWriter.getInstance().write("notify", result.getData().getAppId(),
+                    result.getData().getJobId(), "OK", body);
+        }else{
+            long nextSecond = TimerBackoff.defaultBackOff.nextBackOffSecond(result.getData().getTimes());
+            Long now  = JobTimeMgr.getInstance().getNow(ConstValue.TIMER_JOB_NAME);
+            long nextTime   = JobTimeMgr.calNextJobTime(now + nextSecond);
+            if(nextTime > result.getData().getEndTime()){
+                /**失败**/
+                if(!Helper.isStrEmpty(result.getData().getCbUrl())){
+                    GxTimeCbRequest gxcb = new GxTimeCbRequest();
+                    gxcb.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+                    gxcb.setMsg(HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase());
+                    gxcb.setAppId(result.getData().getAppId());
+                    gxcb.setJobId(result.getData().getJobId());
+                    gxcb.setBody("Time over");
+                    IoFactory.getInstance().callBack(gxcb, result.getData().getCbUrl());
+                }
+                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+                CDRWriter.getInstance().write("notify", result.getData().getAppId(),
+                        result.getData().getJobId(), "Service Unavailable", "Time over");
+            }else{
+                result.getData().setStatus(ConstValue.JOB_PENDDING_STATE);
+            }
+            result.getData().setNextTime(nextTime);
+            try{
+                notifyDao.insertUpdate(result.getData());
+            }catch (Throwable t){
+                logger.error("Update appId:{}, jobId:{}, Status:{}, exceptions:{}",
+                        result.getData().getAppId(), result.getData().getJobId(), ConstValue.JOB_SUCCESS_STATE,
+                        t.getMessage());
+            }
+        }
+        result.setData(null);
     }
 }

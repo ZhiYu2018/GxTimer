@@ -1,8 +1,10 @@
 package com.gexiang.Util;
 
 public class TimerBackoff {
+    private static final long MAX_INTERVAL = 10*6000*1000L;
     private static final double DEFAULT_MULTIPLIER = 1.5D;
     private static double	DEFAULT_RANDOMIZATION_FACTOR = 0.5D;
+    public static final TimerBackoff defaultBackOff = new TimerBackoff(1000, MAX_INTERVAL);
     private long interval;
     private long maxInterval;
     private double randomization_factor;
@@ -14,6 +16,12 @@ public class TimerBackoff {
         this.maxInterval = maxInterval;
         randomization_factor = DEFAULT_RANDOMIZATION_FACTOR;
         multiplier = DEFAULT_MULTIPLIER;
+    }
+
+    public long nextBackOffSecond(int times){
+        long mills = nextBackOffMillis(times);
+        long second = mills/1000L;
+        return ((second == 0)? 1:second);
     }
 
     public long	nextBackOffMillis(int times){

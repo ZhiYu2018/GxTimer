@@ -12,4 +12,5 @@ public interface NotifyDao {
                             @Param("end") long end, @Param("limit")int limit);
     Integer updatePending(@Param("req") TimerReq req);
     Integer updateStatus(@Param("req") TimerReq req);
+    Integer insertUpdate(@Param("req") TimerReq req);
 }

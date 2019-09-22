@@ -3,6 +3,9 @@ package com.gexiang.io;
 import com.alibaba.fastjson.JSON;
 import com.gexiang.constant.ConstValue;
 import com.gexiang.repository.entity.TimerReq;
+import com.gexiang.server.WorkerPool;
+import com.gexiang.vo.GxResult;
+import com.gexiang.vo.GxTimeCbRequest;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
@@ -60,19 +63,25 @@ public class IoFactory {
         return webClient;
     }
 
-    public void forward(TimerReq req){
+    public void forward(TimerReq req, WorkerPool<GxResult<TimerReq, Object>> workerPool){
         switch (req.getReqType().intValue()){
             case ConstValue.REQ_GET_TYPE: {
-                get(req);
+                get(req, workerPool);
                 break;
             }
             default:{
-                post(req.getReqType().intValue(), req);
+                post(req.getReqType().intValue(), req, workerPool);
             }
         }
     }
 
-    private void get(TimerReq req){
+    public void callBack(GxTimeCbRequest cbRequest, String url){
+        Mono<Void> result = webClient.post().uri(url).contentType(MediaType.APPLICATION_JSON)
+                     .syncBody(cbRequest).retrieve().bodyToMono(Void.class);
+        result.subscribe(new CbSubscriber(cbRequest));
+    }
+
+    private void get(TimerReq req, WorkerPool<GxResult<TimerReq, Object>> workerPool){
         WebClient.RequestHeadersUriSpec uriSpec = webClient.get();
         uriSpec.uri(req.getReqUrl());
         if(!ConstValue.DATA_EMPTY.equals(req.getReqHeader())){
@@ -88,10 +97,10 @@ public class IoFactory {
 
         Mono<String> result  = uriSpec.retrieve().onStatus(h -> { return  h.is4xxClientError();}, new FxxFunction(req))
                 .onStatus(h ->{ return h.is5xxServerError(); }, new FxxFunction(req)).bodyToMono(String.class);
-        result.subscribe(new IoSubscriber(req));
+        result.subscribe(new IoSubscriber(req, workerPool));
     }
 
-    private void post(int type,TimerReq req){
+    private void post(int type,TimerReq req, WorkerPool<GxResult<TimerReq, Object>> workerPool){
         WebClient.RequestBodyUriSpec uriSpec;
         if(type == ConstValue.REQ_POST_TYPE) {
             uriSpec = webClient.post();
@@ -125,6 +134,6 @@ public class IoFactory {
 
         Mono<String> result  = uriSpec.retrieve().onStatus(h -> { return  h.is4xxClientError();}, new FxxFunction(req))
                 .onStatus(h ->{ return h.is5xxServerError(); }, new FxxFunction(req)).bodyToMono(String.class);
-        result.subscribe(new IoSubscriber(req));
+        result.subscribe(new IoSubscriber(req, workerPool));
     }
 }

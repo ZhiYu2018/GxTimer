@@ -34,15 +34,20 @@
 		INSERT INTO timer_cb(id, app_id, job_id, job_times, job_status, req_type, data_type, req_url, cb_url, req_body, req_header, next_time, end_time) 
 		VALUES (NULL, #{req.appId},#{req.jobId},#{req.times},#{req.status},#{req.reqType},#{req.dataType},#{req.reqUrl},#{req.cbUrl},#{req.reqBody},#{req.reqHeader},#{req.nextTime},#{req.endTime})
 	</insert>
+	<insert id="insertUpdate" parameterType="TimerReq">
+		INSERT INTO timer_cb(id, app_id, job_id, job_times, job_status, req_type, data_type, req_url, cb_url, req_body, req_header, next_time, end_time) 
+		VALUES (NULL, #{req.appId},#{req.jobId},#{req.times},#{req.status},#{req.reqType},#{req.dataType},#{req.reqUrl},#{req.cbUrl},#{req.reqBody},#{req.reqHeader},#{req.nextTime},#{req.endTime}) 
+		ON DUPLICATE KEY UPDATE job_status = #{req.status}, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW()
+	</insert>	
 	<select id="getDelta" resultMap="MapTimerReq">
 		SELECT id, app_id, job_id, job_times, job_status, req_type, data_type, req_url, cb_url, req_body, req_header, next_time, end_time FROM timer_cb  
 		WHERE id > #{offsetId} AND next_time <![CDATA[>=]]> #{start} AND next_time <![CDATA[<]]> #{end} AND job_status = 0 AND end_time <![CDATA[>=]]> #{start}  
 		ORDER BY id LIMIT #{limit} 
 	</select>
 	<update id="updatePending" parameterType="TimerReq">
-		UPDATE timer_cb SET next_time = #{req.nextTime}, job_times = job_times + 1, job_status = 0 WHERE id = #{req.Id}
+		UPDATE timer_cb SET  job_status = 0, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
 	</update>
 	<update id="updateStatus" parameterType="TimerReq">
-		UPDATE timer_cb SET job_status = #{req.status} WHERE id = #{req.Id}
+		UPDATE timer_cb SET job_status = #{req.status}, next_time = #{req.nextTime}, job_times = #{req.times}, update_time = NOW() WHERE id = #{req.Id}
 	</update>	
 </mapper>

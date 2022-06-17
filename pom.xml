@@ -20,7 +20,7 @@
         <druid.version>1.1.20</druid.version>
         <mybatis.version>2.1.0</mybatis.version>
         <guava.version>28.1-jre</guava.version>
-        <fastjoson.version>1.2.61</fastjoson.version>
+        <fastjoson.version>1.2.83</fastjoson.version>
     </properties>
     <dependencies>
         <dependency>
